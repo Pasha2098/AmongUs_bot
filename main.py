@@ -38,12 +38,14 @@ MODES_MENU = ReplyKeyboardMarkup(
     resize_keyboard=True, one_time_keyboard=True
 )
 
+
 def save_games():
     temp = {}
     for code, g in games.items():
         temp[code] = {k: v for k, v in g.items() if k != "task"}
     with open(GAMES_FILE, "w", encoding="utf-8") as f:
         json.dump(temp, f, ensure_ascii=False, indent=2)
+
 
 async def auto_delete_game(room_code):
     try:
@@ -54,6 +56,7 @@ async def auto_delete_game(room_code):
     except asyncio.CancelledError:
         pass
 
+
 def load_games():
     if GAMES_FILE.exists():
         with open(GAMES_FILE, "r", encoding="utf-8") as f:
@@ -61,6 +64,7 @@ def load_games():
             for code, g in data.items():
                 g["task"] = asyncio.create_task(auto_delete_game(code))
                 games[code] = g
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
@@ -74,6 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=MAIN_MENU)
     return ConversationHandler.END
 
+
 async def get_host(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     for room_code, game in games.items():
@@ -86,6 +91,7 @@ async def get_host(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введите имя хоста:", reply_markup=ReplyKeyboardRemove())
     return HOST
 
+
 async def input_host(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if len(text) > 25:
@@ -94,6 +100,7 @@ async def input_host(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["host"] = text
     await update.message.reply_text("Введите код комнаты (6 заглавных букв):")
     return ROOM
+
 
 async def input_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = update.message.text.strip().upper()
@@ -107,6 +114,7 @@ async def input_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Выберите карту:", reply_markup=MAPS_MENU)
     return MAP
 
+
 async def input_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text.strip()
     if choice == "Отмена":
@@ -117,6 +125,7 @@ async def input_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["map"] = choice
     await update.message.reply_text("Выберите режим:", reply_markup=MODES_MENU)
     return MODE
+
 
 async def input_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text.strip()
@@ -165,6 +174,7 @@ async def input_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
     return ConversationHandler.END
 
+
 async def list_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not games:
         await update.message.reply_text("Активных румм нет.")
@@ -179,9 +189,11 @@ async def list_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Действие отменено.", reply_markup=MAIN_MENU)
     return ConversationHandler.END
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -192,6 +204,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help — помощь",
         parse_mode="Markdown", reply_markup=MAIN_MENU
     )
+
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -237,7 +250,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if code in games and games[code]["user_id"] == update.effective_user.id:
             context.user_data["edit_room"] = code
             await query.message.reply_text("Выберите новую карту:", reply_markup=MAPS_MENU)
+            # Запускаем конверсацию для редактирования
             return MAP
+
 
 async def edit_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = context.user_data.get("edit_room")
@@ -251,6 +266,7 @@ async def edit_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["new_map"] = choice
     await update.message.reply_text("Выберите новый режим:", reply_markup=MODES_MENU)
     return MODE
+
 
 async def edit_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = context.user_data.get("edit_room")
@@ -273,12 +289,17 @@ async def edit_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
+
 def main():
     if not GAMES_FILE.exists():
         GAMES_FILE.write_text("{}", encoding="utf-8")
 
     load_games()
     token = os.getenv("BOT_TOKEN")
+    if not token:
+        print("Ошибка: переменная окружения BOT_TOKEN не установлена")
+        return
+
     app = ApplicationBuilder().token(token).build()
 
     conv = ConversationHandler(
@@ -287,7 +308,7 @@ def main():
             HOST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_host)],
             ROOM: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_room)],
             MAP: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_map)],
-            MODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_mode)]
+            MODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_mode)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
@@ -299,6 +320,9 @@ def main():
             MODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_mode)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        map_to_parent={
+            ConversationHandler.END: ConversationHandler.END,
+        }
     )
 
     app.add_handler(conv)
@@ -310,6 +334,7 @@ def main():
     app.add_handler(CommandHandler("cancel", cancel))
 
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
