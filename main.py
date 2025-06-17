@@ -295,7 +295,7 @@ def main():
         GAMES_FILE.write_text("{}", encoding="utf-8")
 
     load_games()
-    token = os.getenv("BOT_TOKEN")
+    token = os.getenv("7744582303:AAHRSRSGWRXafEexdx59hQQ6pj8N2dvgl9g")
     if not token:
         print("Ошибка: переменная окружения BOT_TOKEN не установлена")
         return
